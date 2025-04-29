@@ -6,7 +6,7 @@ import pandas as pd
 from pathlib import Path
 
 from go_crypto_scanner import scan_golang_files
-from utils import upload_and_save_files, extract_git_repo
+from utils import upload_and_save_files, extract_git_repo, get_file_snippet
 from visualization import (
     plot_crypto_findings_distribution,
     plot_severity_distribution,
