@@ -40,10 +40,19 @@ class FileScanResult:
     def __init__(self, file_path):
         self.file_path = file_path
         self.success = False
-        self.error = None  # type: str or None
+        # Initialize as Any type to avoid type checking errors
+        self.error = None
         self.findings = []
-        self.elapsed_time = 0.0  # type: float
+        self.elapsed_time = 0.0
         self.timed_out = False
+        
+    def set_error(self, error_message):
+        """Set the error message safely"""
+        self.error = error_message
+        
+    def set_elapsed_time(self, elapsed_time):
+        """Set the elapsed time safely"""
+        self.elapsed_time = elapsed_time
 
 def setup_argparse():
     """Setup command-line argument parser"""
@@ -154,10 +163,10 @@ def scan_single_file(file_path, timeout_seconds):
     
     except TimeoutError:
         result.timed_out = True
-        result.error = f"Timeout after {timeout_seconds} seconds"
+        result.set_error(f"Timeout after {timeout_seconds} seconds")
     
     except Exception as e:
-        result.error = str(e)
+        result.set_error(str(e))
     
     finally:
         # Cancel the alarm and restore the original handler
@@ -165,7 +174,7 @@ def scan_single_file(file_path, timeout_seconds):
         signal.signal(signal.SIGALRM, original_handler)
         
         # Record elapsed time
-        result.elapsed_time = time.time() - start_time
+        result.set_elapsed_time(time.time() - start_time)
     
     return result
 
@@ -441,6 +450,9 @@ def save_results_to_file(results, output_file, quiet=False):
 
 def main():
     """Main entry point for the CLI application"""
+    # Initialize args to None before the try block
+    args = None
+    
     try:
         parser = setup_argparse()
         args = parser.parse_args()
@@ -478,8 +490,12 @@ def main():
     except Exception as e:
         print(f"\n{Fore.RED}An unexpected error occurred:{Style.RESET_ALL}")
         print(f"{Fore.RED}{str(e)}{Style.RESET_ALL}")
-        # Safely access the quiet attribute, defaulting to False if args is not defined
-        quiet_mode = getattr(args, 'quiet', False) if 'args' in locals() else False
+        
+        # Determine if we should show verbose error information
+        quiet_mode = False
+        if args is not None and hasattr(args, 'quiet'):
+            quiet_mode = args.quiet
+            
         if not quiet_mode:
             traceback.print_exc()
         return 1
