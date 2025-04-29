@@ -1,6 +1,6 @@
 # Golang Crypto Asset Scanner
 
-A Streamlit-based tool for analyzing Golang projects to identify and visualize cryptographic libraries, assets, and functions.
+A tool for analyzing Golang projects to identify and visualize cryptographic libraries, assets, and functions. Available as both a Streamlit web application and a command-line interface.
 
 ## Overview
 
@@ -18,22 +18,51 @@ The Golang Crypto Asset Scanner is a specialized tool designed for security rese
 - **Visual Analysis**: Interactive charts and tables to visualize findings
 - **Code Snippets**: View the actual code context for each finding
 - **Repository Structure**: View the structure of analyzed git repositories
+- **Command-Line Interface**: Run scans directly from the terminal without UI
 
 ## How to Use
 
-### Option 1: Upload Go Files
+### Web Interface
+
+#### Option 1: Upload Go Files
 
 1. Navigate to the "Upload Files" tab
 2. Click the upload area to select one or more `.go` files
 3. The application will automatically process the files and display results
 
-### Option 2: Scan Git Repository
+#### Option 2: Scan Git Repository
 
 1. Navigate to the "Git Repository" tab
 2. Enter the URL of a Git repository containing Go code
 3. Optionally specify a branch (defaults to main/master)
 4. Click "Scan Repository" to initiate scanning
 5. View results in the visualization panels
+
+### Command-Line Interface
+
+Run the scanner directly from the terminal using `cli.py`:
+
+```bash
+# Scan local Go files or directories
+python cli.py -f path/to/file.go path/to/directory
+
+# Scan a Git repository
+python cli.py -g https://github.com/username/repo.git
+
+# Scan a specific branch of a Git repository
+python cli.py -g https://github.com/username/repo.git -b develop
+
+# Save results to a JSON file
+python cli.py -f path/to/files -o results.json
+
+# Enable verbose output
+python cli.py -f path/to/files -v
+```
+
+For help and available options:
+```bash
+python cli.py --help
+```
 
 ## Visualization and Results
 

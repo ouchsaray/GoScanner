@@ -152,11 +152,15 @@ def extract_imports(content):
 
 def find_line_number(content, pattern):
     """Find the line number for a pattern in the content"""
-    match = re.search(pattern, content)
-    if not match:
-        return None
+    try:
+        match = re.search(pattern, content)
+        if not match:
+            return None
         
-    return content[:match.start()].count('\n') + 1
+        return content[:match.start()].count('\n') + 1
+    except re.error:
+        # Handle regex pattern errors
+        return None
 
 def extract_custom_crypto_functions(content):
     """Extract potential custom crypto functions based on naming patterns"""
