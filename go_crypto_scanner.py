@@ -285,6 +285,344 @@ def analyze_go_file(file_path, content):
             
             findings.append(finding)
     
+    # Check for PRNG weaknesses (use of math/rand instead of crypto/rand)
+    findings.extend(check_prng_weaknesses(file_path, content))
+    
+    # Check for certificate validation bypasses
+    findings.extend(check_certificate_validation(file_path, content))
+    
+    # Check for nonce reuse issues
+    findings.extend(check_nonce_reuse(file_path, content))
+    
+    # Check for side-channel protection
+    findings.extend(check_side_channel_protection(file_path, content))
+    
+    # Check for key length issues
+    findings.extend(check_key_length_issues(file_path, content))
+    
+    # Check for hardcoded credentials
+    findings.extend(check_hardcoded_credentials(file_path, content))
+    
+    return findings
+
+def check_prng_weaknesses(file_path, content):
+    """
+    Check for pseudorandom number generator weaknesses, particularly use of 
+    non-cryptographic random number generators for security purposes.
+    
+    Args:
+        file_path (str): Path to the Go file
+        content (str): Content of the Go file
+        
+    Returns:
+        list: List of findings related to PRNG weaknesses
+    """
+    findings = []
+    
+    # Look for imports of math/rand
+    if re.search(r'import\s+[("]*math/rand[)"]*', content):
+        # Now look for contexts that suggest security usage
+        rand_patterns = [
+            (r'rand\.(Intn|Int|Float\d+)\s*\([^)]*\).*\b(password|key|token|secret|iv|nonce)\b', 
+             "Using non-cryptographic PRNG for security-sensitive value"),
+            (r'\b(password|key|token|secret|iv|nonce)\b.*rand\.(Intn|Int|Float\d+)\s*\([^)]*\)', 
+             "Using non-cryptographic PRNG for security-sensitive value"),
+            (r'rand\.Seed\s*\(\s*time\.Now\(\)\.UnixNano\(\)\s*\)', 
+             "Using predictable seed for random number generator")
+        ]
+        
+        for pattern, description in rand_patterns:
+            matches = re.finditer(pattern, content, re.IGNORECASE | re.MULTILINE)
+            for match in matches:
+                line_num = content[:match.start()].count('\n') + 1
+                matched_text = match.group(0)
+                
+                finding = {
+                    'file_path': file_path,
+                    'type': 'antipattern',
+                    'name': 'Insecure Random Number Generation',
+                    'matched_text': matched_text,
+                    'category': 'security_issue',
+                    'line_number': line_num,
+                    'description': description,
+                    'severity': SEVERITY["HIGH"],
+                    'recommendation': "Use crypto/rand for security-sensitive operations requiring randomness"
+                }
+                
+                findings.append(finding)
+    
+    return findings
+
+def check_certificate_validation(file_path, content):
+    """
+    Check for certificate validation bypass issues in TLS configurations.
+    
+    Args:
+        file_path (str): Path to the Go file
+        content (str): Content of the Go file
+        
+    Returns:
+        list: List of findings related to certificate validation issues
+    """
+    findings = []
+    
+    # Already checked basic InsecureSkipVerify in CRYPTO_ANTIPATTERNS, but let's add more cases
+    
+    # Check for custom certificate verification bypasses or dangerous verification settings
+    cert_bypass_patterns = [
+        (r'VerifyPeerCertificate\s*:.*nil', 
+         "Setting VerifyPeerCertificate to nil while InsecureSkipVerify is true"),
+        (r'CertificateVerify.*func\s*\([^)]*\)\s*{\s*return\s*nil\s*}', 
+         "Custom certificate verification function that returns nil/ignores errors"),
+        (r'tls\.Config\s*{\s*[^}]*RootCAs\s*:\s*nil', 
+         "Using nil for RootCAs in custom TLS configuration"),
+        (r'x509\.VerifyOptions\s*{\s*[^}]*DNSName\s*:\s*""\s*[^}]*}', 
+         "Empty DNS name in certificate verification options")
+    ]
+    
+    for pattern, description in cert_bypass_patterns:
+        matches = re.finditer(pattern, content, re.IGNORECASE | re.MULTILINE)
+        for match in matches:
+            line_num = content[:match.start()].count('\n') + 1
+            matched_text = match.group(0)
+            
+            finding = {
+                'file_path': file_path,
+                'type': 'antipattern',
+                'name': 'Certificate Validation Bypass',
+                'matched_text': matched_text,
+                'category': 'security_issue',
+                'line_number': line_num,
+                'description': description,
+                'severity': SEVERITY["HIGH"],
+                'recommendation': "Always properly verify TLS certificates in production code. Set InsecureSkipVerify to false and use proper certificate chains."
+            }
+            
+            findings.append(finding)
+    
+    return findings
+
+def check_nonce_reuse(file_path, content):
+    """
+    Check for potential nonce reuse issues, particularly with stream ciphers or AEAD.
+    
+    Args:
+        file_path (str): Path to the Go file
+        content (str): Content of the Go file
+        
+    Returns:
+        list: List of findings related to potential nonce reuse
+    """
+    findings = []
+    
+    # Look for patterns suggesting static or reused nonces
+    nonce_reuse_patterns = [
+        (r'var\s+\w+Nonce\s*=\s*\[\]byte{[^}]+}', 
+         "Static nonce definition might lead to nonce reuse"),
+        (r'nonce\s*:=\s*\[\]byte{[^}]+}', 
+         "Hardcoded nonce value"),
+        (r'(?:nonce|iv)\s*:=\s*make\(\[\]byte,\s*\d+\s*\)(\s*//[^\n]*)*\s*[^/\n]*$', 
+         "Nonce created but potentially not filled with random data"),
+        (r'for\s+[^{]*{[^}]*\s+\w*[Nn]once\w*\s*:=[^=]*[^}]*cipher', 
+         "Potential nonce reuse in loop with cipher operations")
+    ]
+    
+    for pattern, description in nonce_reuse_patterns:
+        matches = re.finditer(pattern, content, re.MULTILINE)
+        for match in matches:
+            line_num = content[:match.start()].count('\n') + 1
+            matched_text = match.group(0)
+            
+            # Check for explicit randomness
+            context = extract_code_snippet(content, line_num, context=5)
+            if 'crypto/rand' not in context and 'Read(' not in context:
+                finding = {
+                    'file_path': file_path,
+                    'type': 'antipattern',
+                    'name': 'Potential Nonce Reuse',
+                    'matched_text': matched_text,
+                    'category': 'security_issue',
+                    'line_number': line_num,
+                    'description': description,
+                    'severity': SEVERITY["HIGH"],
+                    'recommendation': "Generate a unique nonce/IV for each encryption operation using crypto/rand and never reuse them, especially with stream ciphers or GCM mode"
+                }
+                
+                findings.append(finding)
+    
+    return findings
+
+def check_side_channel_protection(file_path, content):
+    """
+    Check for proper side-channel protection, particularly constant-time operations
+    for sensitive data comparisons.
+    
+    Args:
+        file_path (str): Path to the Go file
+        content (str): Content of the Go file
+        
+    Returns:
+        list: List of findings related to side-channel vulnerabilities
+    """
+    findings = []
+    
+    # Check for standard comparison of sensitive values
+    sensitive_compares = [
+        (r'(password|secret|token|signature|hmac|mac|hash)\s*==\s*[^=]', 
+         "Direct comparison of sensitive values may be vulnerable to timing attacks"),
+        (r'bytes.Equal\s*\(\s*(password|secret|token|signature|hmac|mac|hash)', 
+         "Using bytes.Equal instead of subtle.ConstantTimeCompare for sensitive comparison"),
+        (r'reflect.DeepEqual\s*\(\s*(password|secret|token|signature|hmac|mac|hash)', 
+         "Using reflect.DeepEqual instead of subtle.ConstantTimeCompare for sensitive comparison")
+    ]
+    
+    for pattern, description in sensitive_compares:
+        matches = re.finditer(pattern, content, re.IGNORECASE | re.MULTILINE)
+        for match in matches:
+            line_num = content[:match.start()].count('\n') + 1
+            matched_text = match.group(0)
+            
+            # Check if we're not using subtle.ConstantTimeCompare in the same context
+            context = extract_code_snippet(content, line_num, context=3)
+            if 'subtle.ConstantTimeCompare' not in context and 'crypto/subtle' not in context:
+                finding = {
+                    'file_path': file_path,
+                    'type': 'antipattern',
+                    'name': 'Non-Constant Time Comparison',
+                    'matched_text': matched_text,
+                    'category': 'security_issue',
+                    'line_number': line_num,
+                    'description': description,
+                    'severity': SEVERITY["MEDIUM"],
+                    'recommendation': "Use crypto/subtle.ConstantTimeCompare for comparing sensitive values to prevent timing attacks"
+                }
+                
+                findings.append(finding)
+    
+    return findings
+
+def check_key_length_issues(file_path, content):
+    """
+    Check for insecure key lengths in cryptographic operations.
+    
+    Args:
+        file_path (str): Path to the Go file
+        content (str): Content of the Go file
+        
+    Returns:
+        list: List of findings related to key length issues
+    """
+    findings = []
+    
+    # Patterns already in CRYPTO_CONSTANTS for small key sizes, but let's add more specific cases
+    key_length_patterns = [
+        (r'rsa\.GenerateKey\s*\([^,]+,\s*(\d+)\s*\)', 
+         lambda match: int(match.group(1)) < 2048,
+         f"RSA key size below 2048 bits: {{match_val}}",
+         "Use at least 2048 bits for RSA keys, preferably 3072 or 4096 for longer-term security"),
+        
+        (r'dsa\.GenerateParameters\s*\([^,]+,\s*(\d+)\s*,', 
+         lambda match: int(match.group(1)) < 2048,
+         f"DSA key parameters below 2048 bits: {{match_val}}",
+         "Use at least 2048 bits for DSA keys or consider using ECDSA instead"),
+        
+        (r'ecdsa\.GenerateKey\s*\([^,]*P(224|192)\b[^,]*,', 
+         lambda match: True,  # Always match these curves
+         f"Using weaker elliptic curve: {{match_val}}",
+         "Use P-256, P-384, or P-521 curves instead of P-224 or P-192"),
+        
+        (r'aes\.NewCipher\s*\(\s*\w+\s*\[\s*:\s*(\d+)\s*\]\s*\)', 
+         lambda match: int(match.group(1)) < 16,
+         f"AES key length below 128 bits: {{match_val}} bytes",
+         "Use at least 16 bytes (128 bits) for AES keys, preferably 24 (192) or 32 (256) bytes")
+    ]
+    
+    for pattern, condition_check, description_template, recommendation in key_length_patterns:
+        matches = re.finditer(pattern, content, re.MULTILINE)
+        for match in matches:
+            if condition_check(match):
+                line_num = content[:match.start()].count('\n') + 1
+                matched_text = match.group(0)
+                match_val = match.group(1)
+                
+                description = description_template.replace("{match_val}", match_val)
+                
+                finding = {
+                    'file_path': file_path,
+                    'type': 'antipattern',
+                    'name': 'Insecure Key Length',
+                    'matched_text': matched_text,
+                    'category': 'security_issue',
+                    'line_number': line_num,
+                    'description': description,
+                    'severity': SEVERITY["HIGH"],
+                    'recommendation': recommendation
+                }
+                
+                findings.append(finding)
+    
+    return findings
+
+def check_hardcoded_credentials(file_path, content):
+    """
+    Enhanced check for hardcoded credentials beyond the basic patterns in CRYPTO_CONSTANTS.
+    
+    Args:
+        file_path (str): Path to the Go file
+        content (str): Content of the Go file
+        
+    Returns:
+        list: List of findings related to hardcoded credentials
+    """
+    findings = []
+    
+    # Additional patterns to check for hardcoded credentials
+    credential_patterns = [
+        (r'(?:const|var)\s+(\w+(?:Key|Secret|Password|Token|Auth))\s*=\s*["`\']([^"`\']{8,})["`\']', 
+         "Hardcoded credential - potentially sensitive: {name} = {value_preview}"),
+        (r'authentication\s*:\s*["`\']([^"`\']{8,})["`\']', 
+         "Hardcoded authentication string detected"),
+        (r'(?:username|user|login)[:=]\s*["`\']([^"`\']+)["`\']\s*(?:,|\n|\r|\})\s*(?:password|pass|pwd)[:=]\s*["`\']([^"`\']+)["`\']', 
+         "Hardcoded username and password combination detected"),
+        (r'[Bb]earer\s+["`\']([A-Za-z0-9\-_=]{8,})["`\']', 
+         "Hardcoded Bearer token detected"),
+        (r'[Aa]uthorization\s*[:=]\s*["`\'].{8,}["`\']', 
+         "Hardcoded Authorization header value detected"),
+        (r'(?:jwt|token)\s*[:=]\s*["`\'][A-Za-z0-9\-_=]{10,}\.[A-Za-z0-9\-_=]{10,}\.[A-Za-z0-9\-_=]{10,}["`\']', 
+         "Hardcoded JWT token detected")
+    ]
+    
+    for pattern, description_template in credential_patterns:
+        matches = re.finditer(pattern, content, re.MULTILINE)
+        for match in matches:
+            line_num = content[:match.start()].count('\n') + 1
+            matched_text = match.group(0)
+            
+            # Create description
+            description = description_template
+            if '{name}' in description_template and match.groups():
+                name = match.group(1)
+                description = description_template.replace('{name}', name)
+            
+            if '{value_preview}' in description_template and len(match.groups()) > 1:
+                value = match.group(2)
+                preview = value[:3] + '...' + value[-3:] if len(value) > 10 else value
+                description = description.replace('{value_preview}', preview)
+            
+            finding = {
+                'file_path': file_path,
+                'type': 'antipattern',
+                'name': 'Hardcoded Credentials',
+                'matched_text': matched_text,
+                'category': 'security_issue',
+                'line_number': line_num,
+                'description': description,
+                'severity': SEVERITY["HIGH"],
+                'recommendation': "Never hardcode credentials in source code. Use environment variables, secure vaults, or configuration systems designed for secrets management."
+            }
+            
+            findings.append(finding)
+    
     return findings
 
 def extract_imports(content):

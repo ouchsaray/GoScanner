@@ -21,29 +21,56 @@ The Golang Crypto Asset Scanner is a specialized tool designed for security rese
 - **Repository Structure**: View the structure of analyzed git repositories
 - **Command-Line Interface**: Run scans directly from the terminal without UI
 
-## Insecure Crypto Algorithm Detection
+## Security Analysis & Vulnerability Detection
 
-The scanner identifies the following insecure cryptographic algorithms and practices:
+The scanner identifies a wide range of cryptographic security issues and vulnerabilities:
 
-### Hashing Algorithms
+### Insecure Cryptographic Algorithms
+
+#### Hashing Algorithms
 - **MD5**: Cryptographically broken due to collision vulnerabilities
 - **SHA-1**: No longer secure for signatures, vulnerable to collision attacks
 
-### Encryption Algorithms
+#### Encryption Algorithms
 - **DES/3DES**: Uses inadequate key sizes vulnerable to brute force attacks
 - **RC4**: Known to be insecure, contains serious weaknesses
 
-### Insecure Modes
+#### Insecure Modes
 - **ECB Mode**: Does not provide semantic security, patterns in the plaintext remain visible
 - **CBC Mode without proper authentication**: Vulnerable to padding oracle attacks
 
-### Insecure Practices
-- **Hardcoded Cryptographic Values**: Detection of hardcoded keys, IVs, salts, or passwords
-- **Static Initialization Vectors**: IVs should be unique for each encryption operation
-- **Non-cryptographic Random Numbers**: Using `math/rand` instead of `crypto/rand`
-- **Insecure TLS Configuration**: TLS certificate verification disabled via `InsecureSkipVerify: true`
-- **Custom Crypto Implementations**: Potentially insecure custom implementations
+### Insecure Cryptographic Practices
+
+#### Random Number Generation
+- **Non-cryptographic RNG**: Detection of `math/rand` usage in security contexts 
+- **Predictable Seeds**: Using time-based or predictable seeds for random generators
+
+#### Key Management Issues
 - **Short Key Sizes**: Detection of RSA keys under 2048 bits, symmetric keys under 128 bits
+- **Hardcoded Keys**: Identification of hardcoded cryptographic keys in source code
+- **Weak Elliptic Curves**: Detection of P-192 and P-224 curves (less secure than P-256+)
+
+#### Nonce/IV Security
+- **Static Initialization Vectors**: Detection of hardcoded or static IVs
+- **Potential Nonce Reuse**: Identifying patterns that might lead to nonce reuse
+- **Uninitialized Nonces**: Created but not properly filled with random data
+
+#### Side-Channel Vulnerabilities
+- **Non-Constant Time Operations**: Detection of standard comparison for sensitive values
+- **Timing Attack Vectors**: Identifying code vulnerable to timing-based attacks
+
+#### TLS Security Issues
+- **Certificate Validation Bypasses**: Detection of `InsecureSkipVerify: true` and similar patterns
+- **Unsafe Certificate Handling**: Identification of nil certificate chains and validation bypasses
+
+#### Authentication & Credential Security
+- **Hardcoded Credentials**: Detection of embedded passwords, tokens, API keys
+- **Weak Password Handling**: Insecure password comparison and processing
+- **JWT Token Exposure**: Hardcoded JWT tokens in source code
+
+#### Implementation Concerns
+- **Custom Crypto Implementations**: Detection of potentially insecure custom encryption or hashing
+- **Low KDF Iteration Counts**: Identifying too few iterations for password hashing
 
 ## How to Use
 
@@ -139,26 +166,27 @@ The scanner provides several visualization methods for analyzing results:
 ## Future Improvements
 
 ### Planned Enhancements
-- **Additional Security Checks**:
-  - Nonce reuse detection for stream and AEAD ciphers
-  - Certificate validation bypass detection (deeper analysis)
-  - Side-channel vulnerability prevention assessment
-  - Cross-package crypto primitive composition analysis
-  - Additional hardcoded credential detection patterns
+- **Advanced Security Checks**:
+  - **Cross-package Crypto Analysis**: Determine how crypto primitives are used together across packages
+  - **Protocol-Level Analysis**: Detecting issues in cryptographic protocol implementations
+  - **Memory Safety Analysis**: Detection of potential memory leaks with sensitive data
+  - **Dynamic Rule Engine**: User-customizable detection rules and severity ratings
+  - **Advanced Code Flow Analysis**: Track data from source (user input) to sink (crypto operations)
 
 - **Technical Improvements**:
-  - Deeper static analysis with call graph tracking
-  - Inter-procedural data flow analysis
-  - Support for more Go frameworks and libraries
-  - Known CVE detection for identified crypto libraries
-  - Dependency chain analysis for transitive crypto usage
+  - **Deeper Static Analysis**: Call graph tracking and comprehensive data flow analysis
+  - **Dependency Chain Analysis**: Detecting vulnerabilities in transitive dependencies
+  - **Known CVE Integration**: Matching identified libraries against vulnerability databases
+  - **False Positive Reduction**: Machine learning-based context analysis
+  - **Performance Optimization**: Parallel processing of large codebases
 
 - **Language Support**:
-  - Expand support to other languages like Rust, Java, and C/C++
-  - Multi-language project analysis capabilities
-  - Language-specific crypto vulnerability detection
+  - **Multi-language Analysis**: Support for Rust, Java, C/C++, Python and JavaScript
+  - **Framework-Specific Rules**: Detection of framework-specific crypto vulnerabilities
+  - **Polyglot Project Support**: Analysis of projects with multiple programming languages
 
 - **Workflow Integration**:
-  - CI/CD pipeline integration for automated scanning
-  - Pull request integration for continuous security assessment
-  - Historical trend analysis of crypto usage in a project
+  - **CI/CD Pipeline Integration**: Native integration with GitHub Actions, GitLab CI, etc.
+  - **IDE Plugins**: Real-time analysis during development
+  - **Compliance Reporting**: Generating compliance reports for standards like FIPS 140-3, SOC2
+  - **Historical Trend Analysis**: Track security improvements over time
