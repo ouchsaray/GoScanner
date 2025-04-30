@@ -1,10 +1,10 @@
 # Golang Crypto Asset Scanner
 
-A tool for analyzing Golang projects to identify and visualize cryptographic libraries, assets, and functions. Available as both a Streamlit web application and a command-line interface.
+A tool for analyzing Golang projects to identify and visualize cryptographic libraries, assets, and functions, as well as detect cryptographic vulnerabilities and security issues. Available as both a Streamlit web application and a command-line interface.
 
 ## Overview
 
-The Golang Crypto Asset Scanner is a specialized tool designed for security researchers, developers, and code auditors who need to quickly identify cryptographic implementations in Go projects. The scanner detects standard and third-party crypto libraries, crypto functions, constants, and even attempts to identify custom cryptographic implementations based on naming conventions.
+The Golang Crypto Asset Scanner is a specialized tool designed for security researchers, developers, and code auditors who need to quickly identify cryptographic implementations in Go projects. The scanner detects standard and third-party crypto libraries, crypto functions, constants, and even attempts to identify custom cryptographic implementations based on naming conventions. It also provides security ratings and recommendations for identified crypto components.
 
 ## Features
 
@@ -15,10 +15,35 @@ The Golang Crypto Asset Scanner is a specialized tool designed for security rese
   - Crypto function calls and definitions
   - Crypto constants and parameters
   - Custom crypto functions (based on naming patterns)
+- **Security Analysis**: Assigns severity ratings and provides recommendations
 - **Visual Analysis**: Interactive charts and tables to visualize findings
 - **Code Snippets**: View the actual code context for each finding
 - **Repository Structure**: View the structure of analyzed git repositories
 - **Command-Line Interface**: Run scans directly from the terminal without UI
+
+## Insecure Crypto Algorithm Detection
+
+The scanner identifies the following insecure cryptographic algorithms and practices:
+
+### Hashing Algorithms
+- **MD5**: Cryptographically broken due to collision vulnerabilities
+- **SHA-1**: No longer secure for signatures, vulnerable to collision attacks
+
+### Encryption Algorithms
+- **DES/3DES**: Uses inadequate key sizes vulnerable to brute force attacks
+- **RC4**: Known to be insecure, contains serious weaknesses
+
+### Insecure Modes
+- **ECB Mode**: Does not provide semantic security, patterns in the plaintext remain visible
+- **CBC Mode without proper authentication**: Vulnerable to padding oracle attacks
+
+### Insecure Practices
+- **Hardcoded Cryptographic Values**: Detection of hardcoded keys, IVs, salts, or passwords
+- **Static Initialization Vectors**: IVs should be unique for each encryption operation
+- **Non-cryptographic Random Numbers**: Using `math/rand` instead of `crypto/rand`
+- **Insecure TLS Configuration**: TLS certificate verification disabled via `InsecureSkipVerify: true`
+- **Custom Crypto Implementations**: Potentially insecure custom implementations
+- **Short Key Sizes**: Detection of RSA keys under 2048 bits, symmetric keys under 128 bits
 
 ## How to Use
 
@@ -68,10 +93,28 @@ python cli.py --help
 
 The scanner provides several visualization methods for analyzing results:
 
-- **Summary Metrics**: Total files scanned, files with crypto components, total findings
-- **Distribution Chart**: Pie chart showing the distribution of different finding types
-- **Findings Table**: Detailed table with all identified crypto components
-- **Detailed Findings**: Expandable sections with code snippets for each finding
+### Overview Dashboard
+- **Security Score**: A calculated score based on the number and severity of findings
+- **Severity Distribution**: Pie chart showing the distribution of findings by severity level
+- **Summary Metrics**: Total files scanned, files with crypto components, high severity issues
+- **Type Distribution**: Pie chart showing the distribution of different finding types
+- **Crypto Libraries Chart**: Bar chart showing the distribution of identified crypto libraries
+
+### Detailed Analysis
+- **Findings Table**: Interactive table with all identified crypto components
+  - Filter by severity (HIGH, MEDIUM, LOW, INFO)
+  - Filter by type (package, library, function, etc.)
+  - Search by name or description
+- **Detailed Findings**: Expandable sections with:
+  - Code snippets for each finding
+  - Severity badges for quick identification
+  - Detailed recommendations for addressing issues
+  - Contextual information about each crypto component
+
+### Security Analysis
+- **Security Issues Chart**: Visual representation of identified security issues
+- **Critical Issues View**: Focused view of HIGH and MEDIUM severity issues
+- **Detailed Recommendations**: Specific guidance for addressing each security concern
 
 ## Technology Stack
 
@@ -95,7 +138,27 @@ The scanner provides several visualization methods for analyzing results:
 
 ## Future Improvements
 
-- Add support for more programming languages
-- Implement deeper static analysis techniques
-- Provide security recommendations based on findings
-- Add support for vulnerable crypto pattern detection
+### Planned Enhancements
+- **Additional Security Checks**:
+  - Nonce reuse detection for stream and AEAD ciphers
+  - Certificate validation bypass detection (deeper analysis)
+  - Side-channel vulnerability prevention assessment
+  - Cross-package crypto primitive composition analysis
+  - Additional hardcoded credential detection patterns
+
+- **Technical Improvements**:
+  - Deeper static analysis with call graph tracking
+  - Inter-procedural data flow analysis
+  - Support for more Go frameworks and libraries
+  - Known CVE detection for identified crypto libraries
+  - Dependency chain analysis for transitive crypto usage
+
+- **Language Support**:
+  - Expand support to other languages like Rust, Java, and C/C++
+  - Multi-language project analysis capabilities
+  - Language-specific crypto vulnerability detection
+
+- **Workflow Integration**:
+  - CI/CD pipeline integration for automated scanning
+  - Pull request integration for continuous security assessment
+  - Historical trend analysis of crypto usage in a project
